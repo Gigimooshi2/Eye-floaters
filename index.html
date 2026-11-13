@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>phosphenes</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #f4f4f2;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  canvas { display: block; }
+
+  /* bottom-corner access buttons */
+  .fab {
+    position: fixed; z-index: 5;
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 14px; border: none; border-radius: 22px; cursor: pointer;
+    background: rgba(20,20,22,0.82); color: #e8e8e8;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.2px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .fab:active { transform: scale(0.95); }
+  .fab.active { background: rgba(60,60,66,0.9); }
+  #btnR { left: 16px; bottom: 72px; }   /* controls, on top */
+  #btnL { left: 16px; bottom: 16px; }   /* colors, below */
+  .fab svg { display: block; }
+
+  .panel {
+    position: fixed; top: 12px; z-index: 6;
+    width: 230px;
+    max-height: calc(100vh - 92px); overflow-y: auto; overscroll-behavior: contain;
+    background: rgba(20,20,22,0.86);
+    color: #e8e8e8; border-radius: 12px; padding: 12px 14px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    font-size: 12px; user-select: none;
+    transition: transform 0.26s cubic-bezier(.2,.8,.2,1), opacity 0.26s ease;
+  }
+  #panel  { right: 12px; transform: translateX(280px); opacity: 0; pointer-events: none; }
+  #panel2 { left: 12px;  transform: translateX(-280px); opacity: 0; pointer-events: none; }
+  #panel.open, #panel2.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+
+  .head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .head strong { font-weight: 600; letter-spacing: 0.3px; }
+  .close {
+    background: rgba(255,255,255,0.12); border: none; color: #e8e8e8;
+    width: 24px; height: 24px; border-radius: 7px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .close:active { background: rgba(255,255,255,0.22); }
+
+  .row { margin: 9px 0; }
+  .row label { display: flex; justify-content: space-between; margin-bottom: 3px; color: #bdbdbd; }
+  .row label span.val { color: #fff; font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    width: 100%; height: 3px; -webkit-appearance: none; appearance: none;
+    background: rgba(255,255,255,0.2); border-radius: 3px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%; background: #fff; cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; border: none; background: #fff; cursor: pointer;
+  }
+  .btn {
+    margin-top: 6px; width: 100%; padding: 7px;
+    background: rgba(255,255,255,0.1); border: none; color: #e8e8e8;
+    border-radius: 7px; cursor: pointer; font-size: 11px;
+  }
+  .btn:active { background: rgba(255,255,255,0.2); }
+
+  .seg { display: flex; gap: 4px; }
+  .seg button {
+    flex: 1; padding: 5px 0; border: none; cursor: pointer;
+    background: rgba(255,255,255,0.1); color: #bdbdbd;
+    border-radius: 6px; font-size: 11px;
+  }
+  .seg button.on { background: #fff; color: #1b1b1d; font-weight: 600; }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 4px 0 10px; color: #bdbdbd;
+  }
+  .toggle-row input { width: 17px; height: 17px; cursor: pointer; }
+
+  .seg { display: flex; gap: 4px; margin: 4px 0 9px; }
+  .seg button {
+    flex: 1; padding: 6px 0; font-size: 11px; border: none; border-radius: 6px;
+    background: rgba(255,255,255,0.1); color: #cfcfcf; cursor: pointer;
+  }
+  .seg button.on { background: #fff; color: #1b1b1d; font-weight: 600; }
+  .seg button:active { background: rgba(255,255,255,0.25); }
+
+  #cells { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+  .cell { position: relative; width: 38px; height: 38px; border-radius: 6px; overflow: hidden;
+          box-shadow: 0 0 0 1px rgba(255,255,255,0.15) inset; }
+  .cell input[type=color] {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    padding: 0; border: none; background: none; cursor: pointer;
+  }
+  .cell input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+  .cell input[type=color]::-webkit-color-swatch { border: none; border-radius: 6px; }
+  .cell.invisible::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(45deg, rgba(70,70,74,0.96) 0 6px, rgba(28,28,32,0.96) 6px 12px);
+  }
+  .cell .inv { position: absolute; top: 2px; right: 2px; z-index: 3; margin: 0;
+               width: 14px; height: 14px; cursor: pointer; }
+  .hint { color: #8f8f93; font-size: 10.5px; line-height: 1.4; margin: 2px 0 2px; }
+
+  .tpl-block { margin-bottom: 10px; }
+  .tpl-label { display: block; color: #bdbdbd; margin-bottom: 4px; }
+  #tpl { width: 100%; padding: 7px; border-radius: 7px; border: none;
+         background: rgba(255,255,255,0.08); color: #fff; font-size: 12px; }
+  .tpl-btns { display: flex; gap: 6px; margin-top: 6px; }
+  .btn2 { flex: 1; padding: 6px 0; border: none; border-radius: 6px;
+          background: rgba(255,255,255,0.1); color: #e8e8e8; font-size: 11px; cursor: pointer; }
+  .btn2:active { background: rgba(255,255,255,0.2); }
+  .sep { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 2px 0 10px; }
+
+  .seg { display: flex; border-radius: 7px; overflow: hidden; margin-top: 3px;
+         box-shadow: 0 0 0 1px rgba(255,255,255,0.15) inset; }
+  .seg button { flex: 1; padding: 6px 0; border: none; background: rgba(255,255,255,0.06);
+                color: #bdbdbd; font-size: 11px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid rgba(255,255,255,0.12); }
+  .seg button.on { background: rgba(255,255,255,0.22); color: #fff; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- access buttons -->
+<button id="btnL" class="fab" aria-label="colors">
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="8" cy="9" r="3.4"/><circle cx="16" cy="9" r="3.4"/><circle cx="12" cy="16" r="3.4"/>
+  </svg>
+  colors
+</button>
+<button id="btnR" class="fab" aria-label="controls">
+  controls
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M4 7h16M4 12h16M4 17h16"/>
+    <circle cx="9" cy="7" r="2.4" fill="currentColor" stroke="none"/>
+    <circle cx="15" cy="12" r="2.4" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="17" r="2.4" fill="currentColor" stroke="none"/>
+  </svg>
+</button>
+
+<!-- main motion / field controls -->
+<div id="panel" class="panel">
+  <div class="head">
+    <strong>phosphenes</strong>
+    <button class="close" data-target="panel" aria-label="close">
+      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="tpl-block">
+    <label class="tpl-label">templates</label>
+    <select id="tpl"></select>
+    <div class="tpl-btns">
+      <button id="tplLoad" class="btn2">load</button>
+      <button id="tplSave" class="btn2">save as…</button>
+      <button id="tplDel" class="btn2">delete</button>
+    </div>
+  </div>
+  <hr class="sep">
+  <div class="row"><label>count <span class="val" id="v_count"></span></label><input type="range" id="count" min="1" max="120" step="1"></div>
+  <div class="row"><label>speed <span class="val" id="v_speed"></span></label><input type="range" id="speed" min="0" max="6" step="0.1"></div>
+  <div class="row"><label>lifespan <span class="val" id="v_life"></span></label><input type="range" id="life" min="15" max="300" step="5"></div>
+  <div class="row"><label>core size <span class="val" id="v_core"></span></label><input type="range" id="core" min="0.5" max="14" step="0.5"></div>
+  <div class="row"><label>halo size <span class="val" id="v_halo"></span></label><input type="range" id="halo" min="1" max="8" step="0.1"></div>
+  <div class="row"><label>grey outline <span class="val" id="v_grey"></span></label><input type="range" id="grey" min="0" max="1" step="0.05"></div>
+  <div class="row"><label>flicker <span class="val" id="v_flick"></span></label><input type="range" id="flick" min="0" max="1" step="0.05"></div>
+  <div class="row"><label>trail <span class="val" id="v_trail"></span></label><input type="range" id="trail" min="0" max="30" step="1"></div>
+  <div class="row"><label>arc / wobble <span class="val" id="v_wob"></span></label><input type="range" id="wob" min="0" max="1.5" step="0.05"></div>
+  <div class="row"><label>background <span class="val" id="v_bg"></span></label><input type="range" id="bg" min="0" max="255" step="1"></div>
+  <button id="reset" class="btn">reset defaults</button>
+</div>
+
+<!-- flashing colors sequencer -->
+<div id="panel2" class="panel">
+  <div class="head">
+    <strong>flashing colors</strong>
+    <button class="close" data-target="panel2" aria-label="close">
+      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="toggle-row"><span>enable color mode</span><input type="checkbox" id="cenable"></div>
+  <div class="row"><label>cells <span class="val" id="v_ccells"></span></label><input type="range" id="ccells" min="1" max="12" step="1"></div>
+  <div id="cells"></div>
+  <div class="hint">Tap a cell to pick its color. Check the box to make that beat invisible (floaters go dark).</div>
+  <div class="row"><label>sequence speed <span class="val" id="v_cspeed"></span></label><input type="range" id="cspeed" min="0.5" max="20" step="0.5"></div>
+  <div class="row"><label>size <span class="val" id="v_csize"></span></label><input type="range" id="csize" min="0.5" max="14" step="0.5"></div>
+  <div class="row"><label>halo size <span class="val" id="v_chalo"></span></label><input type="range" id="chalo" min="1" max="8" step="0.1"></div>
+  <div class="row"><label>halo blur <span class="val" id="v_cblur"></span></label><input type="range" id="cblur" min="0" max="1" step="0.05"></div>
+  <div class="row"><label>halo placement</label>
+    <div class="seg" id="halomode">
+      <button data-mode="inside">inside</button>
+      <button data-mode="outside" class="on">outside</button>
+      <button data-mode="both">both</button>
+    </div>
+  </div>
+  <div class="row"><label>opacity <span class="val" id="v_copac"></span></label><input type="range" id="copac" min="0" max="1" step="0.05"></div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = canvas.width = innerWidth * dpr;
+  H = canvas.height = innerHeight * dpr;
+  canvas.style.width = innerWidth + 'px';
+  canvas.style.height = innerHeight + 'px';
+}
+resize();
+addEventListener('resize', resize);
+
+function disc(x, y, r, style) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = style; ctx.fill();
+}
+function glow(x, y, ri, ro, stops) {
+  const g = ctx.createRadialGradient(x, y, ri, x, y, ro);
+  for (let k = 0; k < stops.length; k++) g.addColorStop(stops[k][0], stops[k][1]);
+  ctx.beginPath(); ctx.arc(x, y, ro, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+}
+
+const DEFAULTS = { count: 22, speed: 1.6, life: 90, core: 3, halo: 3, grey: 0.35, flick: 0.25, trail: 8, wob: 0.3, bg: 244 };
+const P = { ...DEFAULTS };
+
+const P2 = { enabled: false, cells: 3, speed: 4, blur: 0.6, opacity: 1, haloMode: 'outside' };
+const PALETTE = ['#ff2d55','#ff9500','#ffcc00','#34c759','#00c7be','#0a84ff','#5e5ce6','#ffffff','#ff375f','#30d158','#bf5af2','#64d2ff'];
+const seq = [];
+let curCell = 0, lastStep = 0;
+
+function rgbOf(hex) { const n = parseInt(hex.slice(1), 16); return { r: (n>>16)&255, g: (n>>8)&255, b: n&255 }; }
+function ensureSeq(n) {
+  for (let i = seq.length; i < n; i++) { const color = PALETTE[i % PALETTE.length]; seq.push({ color, invisible: false, rgb: rgbOf(color) }); }
+}
+
+class Dot {
+  constructor() { this.reset(); }
+  reset() {
+    const angle = Math.random() * Math.PI * 2;
+    const sp = (0.3 + Math.random()) * P.speed * dpr;
+    this.vx = Math.cos(angle) * sp; this.vy = Math.sin(angle) * sp;
+    this.x = Math.random() * W; this.y = Math.random() * H;
+    this.rBase = (0.6 + Math.random() * 1.4);
+    this.haloMul = (0.8 + Math.random() * 0.6);
+    this.life = 0; this.maxLife = P.life * (0.6 + Math.random() * 0.8);
+    this.wobble = Math.random() * Math.PI * 2;
+    this.wobbleSpeed = (Math.random() - 0.5) * 0.08;
+    this.trail = [];
+  }
+  step() {
+    this.life++; this.wobble += this.wobbleSpeed;
+    this.x += this.vx + Math.cos(this.wobble) * P.wob * dpr;
+    this.y += this.vy + Math.sin(this.wobble) * P.wob * dpr;
+    this.trail.push({ x: this.x, y: this.y });
+    const maxT = Math.max(1, P.trail);
+    while (this.trail.length > maxT) this.trail.shift();
+    if (this.life > this.maxLife || this.x < -60 || this.x > W + 60 || this.y < -60 || this.y > H + 60) this.reset();
+  }
+  alpha() {
+    const t = this.life / this.maxLife;
+    const fade = Math.sin(t * Math.PI);
+    const flicker = (1 - P.flick) + P.flick * Math.sin(this.life * 0.6 + this.wobble);
+    return Math.max(0, fade * flicker);
+  }
+  draw(color) {
+    const a0 = this.alpha();
+    if (a0 <= 0.01) return;
+    if (!color) {
+      const r = this.rBase * P.core * dpr;
+      const ring = r * P.halo * this.haloMul;
+      if (P.trail > 0) for (let i = 0; i < this.trail.length; i++) {
+        const p = this.trail[i]; const ta = a0 * (i / this.trail.length) * 0.35;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r * (0.4 + i / this.trail.length * 0.6), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${ta})`; ctx.fill();
+      }
+      const g = ctx.createRadialGradient(this.x, this.y, r * 0.5, this.x, this.y, ring);
+      g.addColorStop(0, `rgba(255,255,255,${a0})`);
+      g.addColorStop(0.35, `rgba(255,255,255,${a0 * 0.9})`);
+      g.addColorStop(0.6, `rgba(150,150,155,${a0 * P.grey})`);
+      g.addColorStop(1, `rgba(150,150,155,0)`);
+      ctx.beginPath(); ctx.arc(this.x, this.y, ring, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+      ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.fillStyle = `rgba(255,255,255,${a0})`; ctx.fill();
+      return;
+    }
+    const a = a0 * P2.opacity;
+    if (a <= 0.01) return;
+    const R = color.r, G = color.g, B = color.b;
+    const rgba = t => `rgba(${R},${G},${B},${t})`;
+    const cr = this.rBase * P.core * dpr;                       // core / rim radius (shared)
+    const outer = Math.max(cr + 1, cr * P.halo * this.haloMul); // outer reach (shared halo)
+    const soft = P2.blur;
+    const mode = P2.haloMode;
+
+    // trail
+    if (P.trail > 0) for (let i = 0; i < this.trail.length; i++) {
+      const p = this.trail[i]; const ta = a * (i / this.trail.length) * 0.3;
+      ctx.beginPath(); ctx.arc(p.x, p.y, cr * (0.4 + i / this.trail.length * 0.6), 0, Math.PI * 2);
+      ctx.fillStyle = (mode === 'outside') ? `rgba(255,255,255,${ta})` : rgba(ta); ctx.fill();
+    }
+
+    const white = t => `rgba(255,255,255,${t})`;
+    const WA = Math.min(1, a * 1.25);
+
+    // soft-edged white core, so the center of the ball reads white
+    function whiteCore(x, y, wr) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, wr);
+      g.addColorStop(0, white(WA));
+      g.addColorStop(Math.max(0.02, 1 - soft * 0.7), white(WA));
+      g.addColorStop(1, white(0));
+      ctx.beginPath(); ctx.arc(x, y, wr, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+    }
+
+    if (mode === 'outside') {
+      // color is painted ONLY beyond the core edge — never inside it —
+      // so the white center never has color under it to reveal on fade
+      const r0 = Math.min(0.985, cr / outer);
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, outer);
+      g.addColorStop(0, rgba(0));
+      g.addColorStop(r0, rgba(0));                            // fully clear inside the core
+      g.addColorStop(Math.min(0.999, r0 + 0.001), rgba(a));   // color begins at the rim
+      g.addColorStop(1, rgba(a * (1 - soft)));                // blur softens the OUTER edge
+      ctx.beginPath(); ctx.arc(this.x, this.y, outer, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+      whiteCore(this.x, this.y, cr);            // white ball on top
+    }
+
+    else if (mode === 'inside') {
+      // color lives inside the ball; no outward bleed, no white core
+      const rim = Math.min(0.95, Math.max(0.05, 1 - soft * 0.9));
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, cr);
+      g.addColorStop(0, rgba(a));
+      g.addColorStop(rim, rgba(a));
+      g.addColorStop(1, rgba(0));
+      ctx.beginPath(); ctx.arc(this.x, this.y, cr, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+    }
+
+    else { // both: colored glow inside AND outside the rim, white center
+      const rimPos = Math.min(0.9, Math.max(0.1, cr / outer));
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, outer);
+      g.addColorStop(0, rgba(a * 0.35));
+      g.addColorStop(rimPos, rgba(a));
+      g.addColorStop(1, rgba(0));
+      ctx.beginPath(); ctx.arc(this.x, this.y, outer, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+      whiteCore(this.x, this.y, cr * 0.6);      // smaller white center
+    }
+  }
+}
+
+let dots = [];
+function syncCount() {
+  const target = Math.round(P.count);
+  while (dots.length < target) { const d = new Dot(); d.life = Math.random() * d.maxLife; dots.push(d); }
+  if (dots.length > target) dots.length = target;
+}
+syncCount();
+
+function frame() {
+  ctx.clearRect(0, 0, W, H);
+  let colorNow = null, hidden = false;
+  if (P2.enabled) {
+    const now = performance.now();
+    if (now - lastStep >= 1000 / Math.max(0.1, P2.speed)) { lastStep = now; curCell = (curCell + 1) % P2.cells; }
+    const cell = seq[curCell] || seq[0];
+    if (!cell || cell.invisible) hidden = true; else colorNow = cell.rgb;
+  }
+  for (const d of dots) { d.step(); if (P2.enabled && hidden) continue; d.draw(P2.enabled ? colorNow : null); }
+  requestAnimationFrame(frame);
+}
+frame();
+
+// main controls
+const fmt = { count:0, speed:1, life:0, core:1, halo:1, grey:2, flick:2, trail:0, wob:2, bg:0 };
+const ids = Object.keys(DEFAULTS);
+function setBg() { document.body.style.background = `rgb(${P.bg},${P.bg},${Math.max(0, P.bg - 2)})`; }
+// size & halo are shared between the two menus; keep all four sliders in lockstep
+function syncSizeHalo() {
+  const setPair = (mainId, colorId, val) => {
+    [mainId, colorId].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = val;
+      const v = document.getElementById('v_' + id); if (v) v.textContent = Number(val).toFixed(1);
+    });
+  };
+  setPair('core', 'csize', P.core);
+  setPair('halo', 'chalo', P.halo);
+}
+function refresh() {
+  for (const id of ids) { document.getElementById(id).value = P[id]; document.getElementById('v_'+id).textContent = Number(P[id]).toFixed(fmt[id]); }
+  setBg(); syncSizeHalo();
+}
+for (const id of ids) document.getElementById(id).addEventListener('input', e => {
+  P[id] = parseFloat(e.target.value);
+  document.getElementById('v_'+id).textContent = Number(P[id]).toFixed(fmt[id]);
+  if (id === 'count') syncCount();
+  if (id === 'bg') setBg();
+  if (id === 'core' || id === 'halo') syncSizeHalo();
+});
+document.getElementById('reset').addEventListener('click', () => { Object.assign(P, DEFAULTS); syncCount(); refresh(); });
+refresh();
+
+// color controls
+const fmt2 = { ccells:0, cspeed:1, cblur:2, copac:2 };
+const map2 = { ccells:'cells', cspeed:'speed', cblur:'blur', copac:'opacity' };
+function buildCells() {
+  ensureSeq(P2.cells);
+  const wrap = document.getElementById('cells'); wrap.innerHTML = '';
+  for (let i = 0; i < P2.cells; i++) {
+    const cell = seq[i];
+    const d = document.createElement('div'); d.className = 'cell' + (cell.invisible ? ' invisible' : '');
+    const ci = document.createElement('input'); ci.type = 'color'; ci.value = cell.color;
+    ci.addEventListener('input', e => { cell.color = e.target.value; cell.rgb = rgbOf(cell.color); });
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'inv'; cb.checked = cell.invisible; cb.title = 'invisible';
+    cb.addEventListener('change', e => { cell.invisible = e.target.checked; d.classList.toggle('invisible', cell.invisible); });
+    d.appendChild(ci); d.appendChild(cb); wrap.appendChild(d);
+  }
+  if (curCell >= P2.cells) curCell = 0;
+}
+function refresh2() {
+  for (const id in map2) { document.getElementById(id).value = P2[map2[id]]; document.getElementById('v_'+id).textContent = Number(P2[map2[id]]).toFixed(fmt2[id]); }
+  document.getElementById('cenable').checked = P2.enabled;
+  syncSizeHalo();
+}
+for (const id in map2) document.getElementById(id).addEventListener('input', e => {
+  P2[map2[id]] = parseFloat(e.target.value);
+  document.getElementById('v_'+id).textContent = Number(P2[map2[id]]).toFixed(fmt2[id]);
+  if (id === 'ccells') buildCells();
+});
+// size & halo write the SHARED value so the controls menu stays in sync
+document.getElementById('csize').addEventListener('input', e => { P.core = parseFloat(e.target.value); syncSizeHalo(); });
+document.getElementById('chalo').addEventListener('input', e => { P.halo = parseFloat(e.target.value); syncSizeHalo(); });
+document.getElementById('cenable').addEventListener('change', e => { P2.enabled = e.target.checked; lastStep = performance.now(); curCell = 0; });
+
+const haloseg = document.getElementById('halomode');
+function refreshSeg() { haloseg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.mode === P2.haloMode)); }
+haloseg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { P2.haloMode = b.dataset.mode; refreshSeg(); }));
+refreshSeg();
+
+// ---------- templates ----------
+const BUILTIN = {
+  default: {
+    P:  { count:22, speed:1.6, life:90, core:3, halo:3, grey:0.35, flick:0.25, trail:8, wob:0.3, bg:244 },
+    P2: { enabled:false, cells:3, speed:4, blur:0.6, opacity:1, haloMode:'outside' },
+    seq: [ {color:'#ff2d55'}, {color:'#ff9500'}, {color:'#ffcc00'} ]
+  },
+  nadav: {
+    P:  { count:120, speed:5.2, life:40, core:1.0, halo:2.6, grey:0.10, flick:0.05, trail:10, wob:0.30, bg:240 },
+    P2: { enabled:false, cells:3, speed:4, blur:0.5, opacity:1, haloMode:'outside' },
+    seq: [ {color:'#ff2d55'}, {color:'#ff9500'}, {color:'#ffcc00'} ]
+  }
+};
+const BUILTIN_NAMES = Object.keys(BUILTIN);
+function loadStore() { try { return JSON.parse(localStorage.getItem('phos_templates') || '{}'); } catch (e) { return {}; } }
+function saveStore(o) { try { localStorage.setItem('phos_templates', JSON.stringify(o)); } catch (e) {} }
+let savedTpl = loadStore();
+function allTpl() { return Object.assign({}, BUILTIN, savedTpl); }
+
+const tplSel = document.getElementById('tpl');
+function rebuildTplSelect(sel) {
+  const all = allTpl(); tplSel.innerHTML = '';
+  Object.keys(all).forEach(name => {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name + (savedTpl[name] ? '  *' : '');
+    tplSel.appendChild(o);
+  });
+  if (sel) tplSel.value = sel;
+}
+function applyTemplate(t) {
+  if (!t) return;
+  Object.assign(P, t.P);
+  Object.assign(P2, t.P2);
+  seq.length = 0;
+  (t.seq || []).forEach(c => seq.push({ color: c.color, invisible: !!c.invisible, rgb: rgbOf(c.color) }));
+  ensureSeq(P2.cells);
+  syncCount(); buildCells(); refresh(); refresh2(); refreshSeg(); setBg();
+  curCell = 0; lastStep = performance.now();
+}
+function currentTemplate() {
+  return { P: { ...P }, P2: { ...P2 }, seq: seq.slice(0, P2.cells).map(c => ({ color: c.color, invisible: c.invisible })) };
+}
+document.getElementById('tplLoad').addEventListener('click', () => applyTemplate(allTpl()[tplSel.value]));
+document.getElementById('tplSave').addEventListener('click', () => {
+  let name;
+  try { name = prompt('Template name:', tplSel.value || 'my preset'); } catch (e) { name = null; }
+  if (!name) return; name = name.trim(); if (!name) return;
+  savedTpl[name] = currentTemplate(); saveStore(savedTpl); rebuildTplSelect(name);
+});
+document.getElementById('tplDel').addEventListener('click', () => {
+  const name = tplSel.value;
+  if (savedTpl[name]) { delete savedTpl[name]; saveStore(savedTpl); rebuildTplSelect(BUILTIN_NAMES[0]); }
+});
+rebuildTplSelect('nadav');
+applyTemplate(BUILTIN.nadav);
+
+buildCells(); refresh2();
+
+// ---------- menu access: tap buttons + close ----------
+const panel = document.getElementById('panel');
+const panel2 = document.getElementById('panel2');
+const btnR = document.getElementById('btnR');
+const btnL = document.getElementById('btnL');
+
+function toggle(panelEl, btnEl) {
+  const open = !panelEl.classList.contains('open');
+  panelEl.classList.toggle('open', open);
+  btnEl.classList.toggle('active', open);
+}
+btnR.addEventListener('click', () => toggle(panel, btnR));
+btnL.addEventListener('click', () => toggle(panel2, btnL));
+
+document.querySelectorAll('.close').forEach(b => b.addEventListener('click', () => {
+  const t = b.getAttribute('data-target');
+  document.getElementById(t).classList.remove('open');
+  (t === 'panel' ? btnR : btnL).classList.remove('active');
+}));
+</script>
+</body>
+</html>
