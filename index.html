@@ -408,7 +408,7 @@ const VIS_HI = 240, VIS_LO = 220;
 function syncVis() {
   const v = Math.min(VIS_HI - VIS_LO, Math.max(0, VIS_HI - P.bg));
   document.getElementById('vis').value = v;
-  document.getElementById('v_vis').textContent = Math.round(v / (VIS_HI - VIS_LO) * 100) + '%';
+  document.getElementById('v_vis').textContent = v === 0 ? 'default' : Math.round(v / (VIS_HI - VIS_LO) * 100) + '%';
 }
 function setBg() {
   document.body.style.background = `rgb(${P.bg},${P.bg},${Math.max(0, P.bg - 2)})`;
