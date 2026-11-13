@@ -29,6 +29,17 @@
   #btnL { left: 16px; bottom: 16px; }   /* colors, below */
   .fab svg { display: block; }
 
+  /* on-page visibility bar */
+  #visbar {
+    position: fixed; right: 16px; bottom: 16px; z-index: 5;
+    width: 170px; padding: 8px 14px 10px; border-radius: 16px;
+    background: rgba(20,20,22,0.82); color: #e8e8e8;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25); font-size: 12px; user-select: none;
+  }
+  #visbar label { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: 600; }
+  #visbar label span { font-weight: 400; color: #bdbdbd; font-variant-numeric: tabular-nums; }
+
   .panel {
     position: fixed; top: 12px; z-index: 6;
     width: 230px;
@@ -135,6 +146,11 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+
+<div id="visbar">
+  <label for="vis">visibility <span id="v_vis"></span></label>
+  <input type="range" id="vis" min="0" max="20" step="1">
+</div>
 
 <!-- access buttons -->
 <button id="btnL" class="fab" aria-label="colors">
@@ -387,7 +403,23 @@ frame();
 // main controls
 const fmt = { count:0, speed:1, life:0, core:1, halo:1, grey:2, flick:2, trail:0, wob:2, bg:0 };
 const ids = Object.keys(DEFAULTS);
-function setBg() { document.body.style.background = `rgb(${P.bg},${P.bg},${Math.max(0, P.bg - 2)})`; }
+// visibility: 0% = background 240, 100% = background 220 (darker bg, white floaters stand out more)
+const VIS_HI = 240, VIS_LO = 220;
+function syncVis() {
+  const v = Math.min(VIS_HI - VIS_LO, Math.max(0, VIS_HI - P.bg));
+  document.getElementById('vis').value = v;
+  document.getElementById('v_vis').textContent = Math.round(v / (VIS_HI - VIS_LO) * 100) + '%';
+}
+function setBg() {
+  document.body.style.background = `rgb(${P.bg},${P.bg},${Math.max(0, P.bg - 2)})`;
+  syncVis();
+}
+document.getElementById('vis').addEventListener('input', e => {
+  P.bg = VIS_HI - parseFloat(e.target.value);
+  document.getElementById('bg').value = P.bg;
+  document.getElementById('v_bg').textContent = P.bg;
+  setBg();
+});
 // size & halo are shared between the two menus; keep all four sliders in lockstep
 function syncSizeHalo() {
   const setPair = (mainId, colorId, val) => {
